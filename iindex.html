@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hedgehog Crossing Arcade</title>
+    <!-- Web browser address bar favicon updated with custom SVG hedgehog icon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%238b4513'/><circle cx='50' cy='52' r='38' fill='%23f4a460'/><circle cx='38' cy='45' r='5' fill='%23000'/><circle cx='62' cy='45' r='5' fill='%23000'/><circle cx='50' cy='62' r='6' fill='%23000'/></svg>">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #090a0f;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            height: 100vh;
+            max-height: 750px;
+            background: #0e111a;
+            border: 2px solid #00f3ff;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(14, 17, 26, 0.9);
+            border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+            font-size: 14px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            z-index: 10;
+        }
+        .stat-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stat-label {
+            font-size: 9px;
+            color: #8b9bb4;
+            text-transform: uppercase;
+        }
+        .stat-value {
+            color: #00f3ff;
+            text-shadow: 0 0 8px rgba(0, 243, 255, 0.5);
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            flex-grow: 1;
+            background: #0b0e14;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 45px);
+            gap: 8px;
+            padding: 15px;
+            padding-bottom: max(60px, env(safe-area-inset-bottom, 60px));
+            background: rgba(14, 17, 26, 0.95);
+            border-top: 1px solid rgba(0, 243, 255, 0.2);
+            z-index: 10;
+        }
+        .control-btn {
+            background: rgba(0, 243, 255, 0.05);
+            border: 1px solid #00f3ff;
+            color: #00f3ff;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+            transition: all 0.1s ease;
+        }
+        .control-btn:active {
+            background: rgba(0, 243, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+            transform: scale(0.95);
+        }
+        #btn-up { grid-column: 2; grid-row: 1; }
+        #btn-left { grid-column: 1; grid-row: 2; }
+        #btn-down { grid-column: 2; grid-row: 2; }
+        #btn-right { grid-column: 3; grid-row: 2; }
+        
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('hedgehog .png') no-repeat center center;
+            background-size: cover;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            z-index: 20;
+            text-align: center;
+            padding: 40px 25px;
+        }
+
+        .play-btn {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 15px 45px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 6px 0 #2e7d32, 0 10px 15px rgba(0,0,0,0.4);
+            transition: all 0.1s ease;
+            margin-bottom: 20px;
+        }
+
+        .play-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 #2e7d32, 0 2px 5px rgba(0,0,0,0.4);
+        }
+
+        .game-over-box {
+            background: rgba(9, 10, 15, 0.9);
+            border: 2px solid #00f3ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: #fff;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <header>
+            <div class="stat-group">
+                <span class="stat-label">Score</span>
+                <span id="score-val" class="stat-value">0</span>
+            </div>
+            <div class="stat-group">
+                <span class="stat-label">High</span>
+                <span id="highscore-val" class="stat-value">0</span>
+            </div>
+            <div class="stat-group">
+                <span class="stat-label">Level</span>
+                <span id="level-val" class="stat-value">1</span>
+            </div>
+            <div class="stat-group">
+                <span class="stat-label">Lives</span>
+                <span id="lives-val" class="stat-value">❤❤❤</span>
+            </div>
+        </header>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="controls">
+            <button class="control-btn" id="btn-up">▲</button>
+            <button class="control-btn" id="btn-left">◀</button>
+            <button class="control-btn" id="btn-down">▼</button>
+            <button class="control-btn" id="btn-right">▶</button>
+        </div>
+
+        <div id="overlay">
+            <div id="game-over-container"></div>
+            <button class="play-btn" id="start-btn">START GAME</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const scoreEl = document.getElementById('score-val');
+        const highscoreEl = document.getElementById('highscore-val');
+        const levelEl = document.getElementById('level-val');
+        const livesEl = document.getElementById('lives-val');
+        const overlay = document.getElementById('overlay');
+        const gameOverContainer = document.getElementById('game-over-container');
+        const startBtn = document.getElementById('start-btn');
+
+        const COLS = 11;
+        const ROWS = 13;
+        let CELL_SIZE = 40;
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            const width = container.clientWidth;
+            CELL_SIZE = Math.floor(width / COLS);
+            canvas.width = COLS * CELL_SIZE;
+            canvas.height = ROWS * CELL_SIZE;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let score = 0;
+        let highscore = localStorage.getItem('hedgehog_crossing_high') || 0;
+        let level = 1;
+        let lives = 3;
+        let gameRunning = false;
+        let animationId;
+        
+        let showYayTimer = 0;
+
+        highscoreEl.textContent = highscore;
+
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            try {
+                let osc = audioCtx.createOscillator();
+                let gainNode = audioCtx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                let now = audioCtx.currentTime;
+
+                if (type === 'hop') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(300, now + 0.08);
+                    gainNode.gain.setValueAtTime(0.15, now);
+                    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'score') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.setValueAtTime(450, now + 0.08);
+                    osc.frequency.setValueAtTime(600, now + 0.16);
+                    gainNode.gain.setValueAtTime(0.2, now);
+                    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'die') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                    gainNode.gain.setValueAtTime(0.3, now);
+                    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            } catch(e) {}
+        }
+
+        let hedgehog = {
+            x: Math.floor(COLS / 2),
+            y: ROWS - 1,
+            targetX: Math.floor(COLS / 2) * CELL_SIZE,
+            targetY: (ROWS - 1) * CELL_SIZE,
+            pixelX: Math.floor(COLS / 2) * CELL_SIZE,
+            pixelY: (ROWS - 1) * CELL_SIZE,
+            direction: 'up'
+        };
+
+        let particles = [];
+
+        const baseLanes = [
+            { type: 'safe' }, // 0: Goal / Family Zone
+            { type: 'log', baseSpeed: 0.7, length: 3, color: '#8b5a2b' }, // 1: Log
+            { type: 'log', baseSpeed: -0.8, length: 2, color: '#654321' }, // 2: Log
+            { type: 'log', baseSpeed: 0.9, length: 3, color: '#8b5a2b' }, // 3: Log
+            { type: 'log', baseSpeed: -0.6, length: 3, color: '#654321' }, // 4: Log
+            { type: 'log', baseSpeed: 0.7, length: 2, color: '#8b5a2b' }, // 5: Log
+            { type: 'safe' }, // 6: Middle Rest Zone
+            { type: 'car', baseSpeed: -0.7, length: 2, color: '#ff5500' }, // 7
+            { type: 'car', baseSpeed: 0.8, length: 2, color: '#ffff00' }, // 8
+            { type: 'car', baseSpeed: -0.6, length: 2, color: '#b000ff' }, // 9
+            { type: 'car', baseSpeed: 0.9, length: 2, color: '#ff0055' }, // 10
+            { type: 'car', baseSpeed: -0.8, length: 2, color: '#00ffcc' }, // 11
+            { type: 'safe' }  // 12: Start Zone
+        ];
+
+        let obstacles = [];
+
+        function initLanes() {
+            obstacles = [];
+            let speedMultiplier = 1 + (level - 1) * 0.15;
+
+            for (let r = 0; r < ROWS; r++) {
+                const lane = baseLanes[r];
+                if (lane && lane.type !== 'safe') {
+                    let adjustedSpeed = lane.baseSpeed > 0 ? lane.baseSpeed * speedMultiplier : lane.baseSpeed * speedMultiplier;
+                    obstacles.push({
+                        lane: r,
+                        x: Math.random() * (canvas.width * 0.5),
+                        width: lane.length * CELL_SIZE,
+                        speed: adjustedSpeed,
+                        color: lane.color,
+                        type: lane.type
+                    });
+                }
+            }
+        }
+
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: x + CELL_SIZE / 2,
+                    y: y + CELL_SIZE / 2,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    alpha: 1,
+                    color: color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        function moveHedgehog(dx, dy) {
+            if (!gameRunning) return;
+            initAudio();
+            
+            if (dx > 0) hedgehog.direction = 'right';
+            else if (dx < 0) hedgehog.direction = 'left';
+            else if (dy < 0) hedgehog.direction = 'up';
+            else if (dy > 0) hedgehog.direction = 'down';
+
+            let newX = hedgehog.x + dx;
+            let newY = hedgehog.y + dy;
+
+            if (newX >= 0 && newX < COLS && newY >= 0 && newY < ROWS) {
+                hedgehog.x = newX;
+                hedgehog.y = newY;
+                hedgehog.targetX = hedgehog.x * CELL_SIZE;
+                hedgehog.targetY = hedgehog.y * CELL_SIZE;
+                playSound('hop');
+                
+                if (dy < 0) {
+                    score += 10;
+                    checkHighScore();
+                }
+            }
+        }
+
+        function checkHighScore() {
+            if (score > highscore) {
+                highscore = score;
+                highscoreEl.textContent = highscore;
+                localStorage.setItem('hedgehog_crossing_high', highscore);
+            }
+            scoreEl.textContent = score;
+        }
+
+        document.getElementById('btn-up').addEventListener('click', () => moveHedgehog(0, -1));
+        document.getElementById('btn-down').addEventListener('click', () => moveHedgehog(0, 1));
+        document.getElementById('btn-left').addEventListener('click', () => moveHedgehog(-1, 0));
+        document.getElementById('btn-right').addEventListener('click', () => moveHedgehog(1, 0));
+
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'KeyW'].includes(e.code)) moveHedgehog(0, -1);
+            if (['ArrowDown', 'KeyS'].includes(e.code)) moveHedgehog(0, 1);
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) moveHedgehog(-1, 0);
+            if (['ArrowRight', 'KeyD'].includes(e.code)) moveHedgehog(1, 0);
+        });
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            let dx = e.changedTouches[0].clientX - touchStartX;
+            let dy = e.changedTouches[0].clientY - touchStartY;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 30) moveHedgehog(1, 0);
+                else if (dx < -30) moveHedgehog(-1, 0);
+            } else {
+                if (dy > 30) moveHedgehog(0, 1);
+                else if (dy < -30) moveHedgehog(0, -1);
+            }
+        });
+
+        function resetHedgehog() {
+            hedgehog.x = Math.floor(COLS / 2);
+            hedgehog.y = ROWS - 1;
+            hedgehog.targetX = hedgehog.x * CELL_SIZE;
+            hedgehog.targetY = hedgehog.y * CELL_SIZE;
+            hedgehog.pixelX = hedgehog.targetX;
+            hedgehog.pixelY = hedgehog.targetY;
+            hedgehog.direction = 'up';
+        }
+
+        function loseLife() {
+            playSound('die');
+            createParticles(hedgehog.pixelX, hedgehog.pixelY, '#ff0055');
+            lives--;
+            updateLivesDisplay();
+            if (lives <= 0) {
+                gameOver();
+            } else {
+                resetHedgehog();
+            }
+        }
+
+        function updateLivesDisplay() {
+            livesEl.textContent = '❤'.repeat(Math.max(0, lives));
+        }
+
+        function update() {
+            if (showYayTimer > 0) {
+                showYayTimer--;
+            }
+
+            hedgehog.pixelX += (hedgehog.targetX - hedgehog.pixelX) * 0.3;
+            hedgehog.pixelY += (hedgehog.targetY - hedgehog.pixelY) * 0.3;
+
+            obstacles.forEach(obs => {
+                obs.x += obs.speed;
+                if (obs.speed > 0 && obs.x > canvas.width) {
+                    obs.x = -obs.width;
+                } else if (obs.speed < 0 && obs.x + obs.width < 0) {
+                    obs.x = canvas.width;
+                }
+            });
+
+            if (Math.abs(hedgehog.targetX - hedgehog.pixelX) < 1) {
+                hedgehog.pixelX = hedgehog.targetX;
+                hedgehog.x = Math.round(hedgehog.pixelX / CELL_SIZE);
+            }
+            if (Math.abs(hedgehog.targetY - hedgehog.pixelY) < 1) {
+                hedgehog.pixelY = hedgehog.targetY;
+                hedgehog.y = Math.round(hedgehog.pixelY / CELL_SIZE);
+            }
+
+            if (Math.abs(hedgehog.targetY - hedgehog.pixelY) < 0.5) {
+                let currentLane = baseLanes[hedgehog.y];
+
+                if (currentLane.type === 'car') {
+                    let hit = false;
+                    obstacles.filter(o => o.lane === hedgehog.y).forEach(car => {
+                        let hLeft = hedgehog.pixelX + 4;
+                        let hRight = hedgehog.pixelX + CELL_SIZE - 4;
+                        let carVisualX = car.x + 4;
+                        let carVisualWidth = car.width - 8;
+
+                        if (hRight > carVisualX && hLeft < carVisualX + carVisualWidth) {
+                            hit = true;
+                        }
+                    });
+                    if (hit) loseLife();
+                } 
+                else if (currentLane.type === 'log') {
+                    let onPlatform = false;
+                    let activePlatform = null;
+                    obstacles.filter(o => o.lane === hedgehog.y).forEach(plat => {
+                        let hLeft = hedgehog.pixelX + 4;
+                        let hRight = hedgehog.pixelX + CELL_SIZE - 4;
+                        if (hRight > plat.x && hLeft < plat.x + plat.width) {
+                            onPlatform = true;
+                            activePlatform = plat;
+                        }
+                    });
+                    if (onPlatform && activePlatform) {
+                        hedgehog.targetX += activePlatform.speed;
+                        hedgehog.pixelX += activePlatform.speed;
+                        if (hedgehog.pixelX < 0 || hedgehog.pixelX > canvas.width - CELL_SIZE) {
+                            loseLife();
+                        }
+                    } else {
+                        loseLife();
+                    }
+                } 
+                else if (currentLane.type === 'safe' && hedgehog.y === 0) {
+                    playSound('score');
+                    
+                    if ('speechSynthesis' in window) {
+                        let cheer = new SpeechSynthesisUtterance("Yay!");
+                        cheer.pitch = 1.8; 
+                        cheer.rate = 1.2;
+                        window.speechSynthesis.speak(cheer);
+                    }
+
+                    showYayTimer = 90; 
+
+                    score += 150;
+                    checkHighScore();
+                    createParticles(hedgehog.pixelX, hedgehog.pixelY, '#00ffcc');
+                    
+                    level++;
+                    levelEl.textContent = level;
+                    initLanes();
+                    resetHedgehog();
+                }
+            }
+
+            particles.forEach((p, index) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+                if (p.alpha <= 0) particles.splice(index, 1);
+            });
+        }
+
+        function drawCar(obs) {
+            ctx.save();
+            let x = obs.x + 4;
+            let y = obs.lane * CELL_SIZE + 6;
+            let w = obs.width - 8;
+            let h = CELL_SIZE - 12;
+
+            ctx.shadowColor = obs.color;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = obs.color;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 6);
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#090a0f';
+            let wheelW = 8;
+            let wheelH = 4;
+            ctx.fillRect(x + 8, y - 2, wheelW, wheelH);
+            ctx.fillRect(x + 8, y + h - 2, wheelW, wheelH);
+            ctx.fillRect(x + w - 16, y - 2, wheelW, wheelH);
+            ctx.fillRect(x + w - 16, y + h - 2, wheelW, wheelH);
+
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.6)';
+            if (obs.speed > 0) {
+                ctx.fillRect(x + w - 22, y + 5, 8, h - 10);
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = 8;
+                ctx.fillRect(x + w - 4, y + 4, 4, 4);
+                ctx.fillRect(x + w - 4, y + h - 8, 4, 4);
+            } else {
+                ctx.fillRect(x + 14, y + 5, 8, h - 10);
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = 8;
+                ctx.fillRect(x, y + 4, 4, 4);
+                ctx.fillRect(x, y + h - 8, 4, 4);
+            }
+
+            ctx.restore();
+        }
+
+        function drawLog(obs) {
+            ctx.save();
+            let x = obs.x;
+            let y = obs.lane * CELL_SIZE + 6;
+            let w = obs.width;
+            let h = CELL_SIZE - 12;
+
+            ctx.shadowColor = '#241005';
+            ctx.shadowBlur = 6;
+            ctx.fillStyle = obs.color;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 8);
+            ctx.fill();
+
+            ctx.strokeStyle = '#381907';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x + 10, y + h / 2);
+            ctx.lineTo(x + w - 10, y + h / 2);
+            ctx.stroke();
+
+            ctx.fillStyle = '#d2b48c';
+            ctx.beginPath();
+            ctx.ellipse(x + 6, y + h / 2, 4, h / 2 - 2, 0, 0, Math.PI * 2);
+            ctx.ellipse(x + w - 6, y + h / 2, 4, h / 2 - 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawHedgehogBody(px, py, size, direction, isBaby = false, glowColor = '#a0522d') {
+            ctx.save();
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = isBaby ? 6 : 10;
+            
+            ctx.translate(px + size / 2, py + size / 2);
+
+            if (!isBaby) {
+                if (direction === 'down') ctx.rotate(Math.PI);
+                else if (direction === 'left') ctx.rotate(-Math.PI / 2);
+                else if (direction === 'right') ctx.rotate(Math.PI / 2);
+            }
+
+            let scale = isBaby ? 0.65 : 1;
+            ctx.scale(scale, scale);
+
+            ctx.fillStyle = '#8b4513';
+            ctx.beginPath();
+            ctx.arc(0, 2, size * 0.38, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#d2691e';
+            ctx.beginPath();
+            ctx.arc(0, 5, size * 0.32, 0, Math.PI);
+            ctx.fill();
+
+            ctx.fillStyle = '#f4a460';
+            ctx.beginPath();
+            ctx.arc(0, -size * 0.08, size * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#d2691e';
+            ctx.beginPath();
+            ctx.arc(-size * 0.18, -size * 0.22, size * 0.08, 0, Math.PI * 2);
+            ctx.arc(size * 0.18, -size * 0.22, size * 0.08, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#090a0f';
+            ctx.beginPath();
+            ctx.arc(0, -size * 0.26, size * 0.06, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-size * 0.09, -size * 0.12, size * 0.05, 0, Math.PI * 2);
+            ctx.arc(size * 0.09, -size * 0.12, size * 0.05, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#090a0f';
+            ctx.beginPath();
+            ctx.arc(-size * 0.09, -size * 0.12, size * 0.025, 0, Math.PI * 2);
+            ctx.arc(size * 0.09, -size * 0.12, size * 0.025, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawFamilyZone() {
+            let colsToDraw = [2, 5, 8];
+            colsToDraw.forEach((col, index) => {
+                let x = col * CELL_SIZE;
+                let y = 0 * CELL_SIZE;
+                if (index === 1) {
+                    drawHedgehogBody(x, y, CELL_SIZE, 'down', false, '#ff77aa');
+                } else {
+                    drawHedgehogBody(x, y, CELL_SIZE, 'up', true, '#ffcc00');
+                }
+            });
+
+            if (showYayTimer > 0) {
+                ctx.save();
+                let signX = 5 * CELL_SIZE + CELL_SIZE / 2;
+                let signY = 10;
+                
+                let bounce = Math.sin(showYayTimer * 0.3) * 4;
+                ctx.translate(signX, signY + bounce);
+                
+                ctx.fillStyle = '#8b5a2b';
+                ctx.fillRect(-2, 10, 4, 15);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#d2b48c';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(-22, -10, 44, 20, 4);
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.fillStyle = '#ff0055';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('YAY!', 0, 1);
+                
+                ctx.restore();
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let r = 0; r < ROWS; r++) {
+                if (r === 0 || r === 6 || r === ROWS - 1) {
+                    ctx.fillStyle = '#161f33';
+                } else if (r < 6) {
+                    ctx.fillStyle = '#0055a5';
+                } else {
+                    ctx.fillStyle = '#141824';
+                }
+                ctx.fillRect(0, r * CELL_SIZE, canvas.width, CELL_SIZE);
+                
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.08)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(0, r * CELL_SIZE, canvas.width, CELL_SIZE);
+
+                if (r === 6) {
+                    ctx.save();
+                    ctx.shadowColor = '#00f3ff';
+                    ctx.shadowBlur = 5;
+                    ctx.fillStyle = '#00f3ff';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('⚡ SAFE REST ZONE ⚡', canvas.width / 2, r * CELL_SIZE + CELL_SIZE / 2 + 3);
+                    ctx.restore();
+                }
+            }
+
+            drawFamilyZone();
+
+            obstacles.forEach(obs => {
+                if (obs.type === 'car') {
+                    drawCar(obs);
+                } else if (obs.type === 'log') {
+                    drawLog(obs);
+                }
+            });
+
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 8;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                ctx.restore();
+            });
+
+            drawHedgehogBody(hedgehog.pixelX, hedgehog.pixelY, CELL_SIZE, hedgehog.direction, false);
+        }
+
+        function loop() {
+            if (!gameRunning) return;
+            update();
+            draw();
+            animationId = requestAnimationFrame(loop);
+        }
+
+        function startGame() {
+            initAudio();
+            score = 0;
+            level = 1;
+            lives = 3;
+            showYayTimer = 0;
+            scoreEl.textContent = score;
+            levelEl.textContent = level;
+            updateLivesDisplay();
+            initLanes();
+            resetHedgehog();
+            gameOverContainer.innerHTML = '';
+            overlay.style.display = 'none';
+            gameRunning = true;
+            cancelAnimationFrame(animationId);
+            loop();
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            
+            gameOverContainer.innerHTML = `
+                <div class="game-over-box">
+                    <h2 style="margin: 0 0 10px 0; color: #ff0055;">GAME OVER</h2>
+                    <p style="text-align: center; font-size: 14px; margin: 0;">Final Score: <strong>${score}</strong><br>Reached Level: <strong>${level}</strong></p>
+                </div>
+            `;
+            
+            startBtn.textContent = "PLAY AGAIN";
+            overlay.style.display = 'flex';
+        }
+
+        startBtn.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
